@@ -15,6 +15,7 @@ def get_openrouter_models():
         path=llm.user_dir() / "openrouter_models.json",
         cache_timeout=3600,
     )["data"]
+    # Annotate models with their schema support
     schema_supporting_ids = {
         model["id"]
         for model in fetch_cached_json(
@@ -23,9 +24,21 @@ def get_openrouter_models():
             cache_timeout=3600,
         )["data"]
     }
-    # Annotate models with their schema support
+
+    # Annotate models with their tool support
+    tool_supporting_ids = {
+        model["id"]
+        for model in fetch_cached_json(
+            url="https://openrouter.ai/api/v1/models?supported_parameters=tools,tool_choice",
+            path=llm.user_dir() / "openrouter_models_tools.json",
+            cache_timeout=3600,
+        )["data"]
+    }
+
     for model in models:
         model["supports_schema"] = model["id"] in schema_supporting_ids
+        model["supports_tools"] = model["id"] in tool_supporting_ids
+
     return models
 
 
@@ -73,6 +86,14 @@ class OpenRouterChat(_mixin, Chat):
     def __str__(self):
         return "OpenRouter: {}".format(self.model_id)
 
+    def build_messages(self, prompt, conversation):
+        messages = Chat.build_messages(self, prompt, conversation)
+        if "deepseek" in self.model_id:
+            for message in messages:
+                if message.get("role", "") == "assistant" and "tool_calls" in message:
+                    message["content"] = ""
+        return messages
+
 
 class OpenRouterAsyncChat(_mixin, AsyncChat):
     needs_key = "openrouter"
@@ -95,6 +116,8 @@ def register_models(register):
             model_name=model_definition["id"],
             vision=supports_images,
             supports_schema=model_definition["supports_schema"],
+            supports_tools=model_definition["supports_tools"],
+            can_stream=not model_definition["supports_tools"],
             api_base="https://openrouter.ai/api/v1",
             headers={"HTTP-Referer": "https://llm.datasette.io/", "X-Title": "LLM"},
         )
@@ -195,6 +218,7 @@ def register_commands(cli):
                             + (value if isinstance(value, str) else json.dumps(value))
                         )
                 bits.append(f"  supports_schema: {model['supports_schema']}")
+                bits.append(f"  supports_tools: {model['supports_tools']}")
                 pricing = format_pricing(model["pricing"])
                 if pricing:
                     bits.append("  pricing: " + pricing)
