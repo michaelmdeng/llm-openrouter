@@ -111,6 +111,15 @@ class OpenRouterChat(_mixin, Chat):
     def __str__(self):
         return "OpenRouter: {}".format(self.model_id)
 
+    def build_messages(self, prompt, conversation, image_detail=None):
+        messages = Chat.build_messages(self, prompt, conversation, image_detail=image_detail)
+        if self.supports_tools:
+            for message in messages:
+                if message.get("role", "") == "assistant" and "tool_calls" in message:
+                    if "content" not in message:
+                        message["content"] = ""
+        return messages
+
 
 class OpenRouterAsyncChat(_mixin, AsyncChat):
     needs_key = "openrouter"
