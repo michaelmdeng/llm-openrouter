@@ -107,6 +107,14 @@ class OpenRouterChat(_mixin, Chat):
     def __str__(self):
         return "OpenRouter: {}".format(self.model_id)
 
+    def build_messages(self, prompt, conversation):
+        messages = Chat.build_messages(self, prompt, conversation)
+        if "deepseek" in self.model_id:
+            for message in messages:
+                if message.get("role", "") == "assistant" and "tool_calls" in message:
+                    message["content"] = ""
+        return messages
+
 
 class OpenRouterAsyncChat(_mixin, AsyncChat):
     needs_key = "openrouter"
