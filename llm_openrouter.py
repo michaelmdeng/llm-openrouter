@@ -88,10 +88,11 @@ class OpenRouterChat(_mixin, Chat):
 
     def build_messages(self, prompt, conversation):
         messages = Chat.build_messages(self, prompt, conversation)
-        if "deepseek" in self.model_id:
+        if self.supports_tools:
             for message in messages:
                 if message.get("role", "") == "assistant" and "tool_calls" in message:
-                    message["content"] = ""
+                    if "content" not in message:
+                        message["content"] = ""
         return messages
 
 
